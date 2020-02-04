@@ -910,7 +910,7 @@ def build(designspace, master_finder=lambda s:s, exclude=[], optimize=True):
 
 		# TODO: Only the first return value is used. Remove the rest at some point.
 		return vf, model, master_ttfs
-	except (AssertionError, TypeError) as e:
+	except (AssertionError, TypeError, ValueError) as e:
 		raise VarLibError(f"Building variable font failed: {str(e)}") from e
 
 
