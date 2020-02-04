@@ -831,81 +831,87 @@ def build(designspace, master_finder=lambda s:s, exclude=[], optimize=True):
 	filename as found in designspace file and map it to master font
 	binary as to be opened (eg. .ttf or .otf).
 	"""
-	if hasattr(designspace, "sources"):  # Assume a DesignspaceDocument
-		pass
-	else:  # Assume a file path
-		designspace = DesignSpaceDocument.fromfile(designspace)
+	try:
+		if hasattr(designspace, "sources"):  # Assume a DesignspaceDocument
+			pass
+		else:  # Assume a file path
+			designspace = DesignSpaceDocument.fromfile(designspace)
 
-	ds = load_designspace(designspace)
-	log.info("Building variable font")
+		ds = load_designspace(designspace)
+		log.info("Building variable font")
 
-	log.info("Loading master fonts")
-	master_fonts = load_masters(designspace, master_finder)
+		log.info("Loading master fonts")
+		master_fonts = load_masters(designspace, master_finder)
 
-	# TODO: 'master_ttfs' is unused except for return value, remove later
-	master_ttfs = []
-	for master in master_fonts:
-		try:
-			master_ttfs.append(master.reader.file.name)
-		except AttributeError:
-			master_ttfs.append(None)  # in-memory fonts have no path
+		# TODO: 'master_ttfs' is unused except for return value, remove later
+		master_ttfs = []
+		for master in master_fonts:
+			try:
+				master_ttfs.append(master.reader.file.name)
+			except AttributeError:
+				master_ttfs.append(None)  # in-memory fonts have no path
 
-	# Copy the base master to work from it
-	vf = deepcopy(master_fonts[ds.base_idx])
+		# Copy the base master to work from it
+		vf = deepcopy(master_fonts[ds.base_idx])
 
-	# TODO append masters as named-instances as well; needs .designspace change.
-	fvar = _add_fvar(vf, ds.axes, ds.instances)
-	if 'STAT' not in exclude:
-		_add_stat(vf, ds.axes)
-	if 'avar' not in exclude:
-		_add_avar(vf, ds.axes)
+		# TODO append masters as named-instances as well; needs .designspace change.
+		fvar = _add_fvar(vf, ds.axes, ds.instances)
+		if "STAT" not in exclude:
+			_add_stat(vf, ds.axes)
+		if "avar" not in exclude:
+			_add_avar(vf, ds.axes)
 
-	# Map from axis names to axis tags...
-	normalized_master_locs = [
-		{ds.axes[k].tag: v for k,v in loc.items()} for loc in ds.normalized_master_locs
-	]
-	# From here on, we use fvar axes only
-	axisTags = [axis.axisTag for axis in fvar.axes]
+		# Map from axis names to axis tags...
+		normalized_master_locs = [
+			{ds.axes[k].tag: v for k, v in loc.items()}
+			for loc in ds.normalized_master_locs
+		]
+		# From here on, we use fvar axes only
+		axisTags = [axis.axisTag for axis in fvar.axes]
 
-	# Assume single-model for now.
-	model = models.VariationModel(normalized_master_locs, axisOrder=axisTags)
-	assert 0 == model.mapping[ds.base_idx]
+		# Assume single-model for now.
+		model = models.VariationModel(normalized_master_locs, axisOrder=axisTags)
+		assert 0 == model.mapping[ds.base_idx]
 
-	log.info("Building variations tables")
-	if 'MVAR' not in exclude:
-		_add_MVAR(vf, model, master_fonts, axisTags)
-	if 'HVAR' not in exclude:
-		_add_HVAR(vf, model, master_fonts, axisTags)
-	if 'VVAR' not in exclude and 'vmtx' in vf:
-		_add_VVAR(vf, model, master_fonts, axisTags)
-	if 'GDEF' not in exclude or 'GPOS' not in exclude:
-		_merge_OTL(vf, model, master_fonts, axisTags)
-	if 'gvar' not in exclude and 'glyf' in vf:
-		_add_gvar(vf, model, master_fonts, optimize=optimize)
-	if 'cvar' not in exclude and 'glyf' in vf:
-		_merge_TTHinting(vf, model, master_fonts)
-	if 'GSUB' not in exclude and ds.rules:
-		_add_GSUB_feature_variations(vf, ds.axes, ds.internal_axis_supports, ds.rules, ds.rulesProcessingLast)
-	if 'CFF2' not in exclude and ('CFF ' in vf or 'CFF2' in vf):
-		_add_CFF2(vf, model, master_fonts)
-		if "post" in vf:
-			# set 'post' to format 2 to keep the glyph names dropped from CFF2
-			post = vf["post"]
-			if post.formatType != 2.0:
-				post.formatType = 2.0
-				post.extraNames = []
-				post.mapping = {}
+		log.info("Building variations tables")
+		if "MVAR" not in exclude:
+			_add_MVAR(vf, model, master_fonts, axisTags)
+		if "HVAR" not in exclude:
+			_add_HVAR(vf, model, master_fonts, axisTags)
+		if "VVAR" not in exclude and "vmtx" in vf:
+			_add_VVAR(vf, model, master_fonts, axisTags)
+		if "GDEF" not in exclude or "GPOS" not in exclude:
+			_merge_OTL(vf, model, master_fonts, axisTags)
+		if "gvar" not in exclude and "glyf" in vf:
+			_add_gvar(vf, model, master_fonts, optimize=optimize)
+		if "cvar" not in exclude and "glyf" in vf:
+			_merge_TTHinting(vf, model, master_fonts)
+		if "GSUB" not in exclude and ds.rules:
+			_add_GSUB_feature_variations(
+				vf, ds.axes, ds.internal_axis_supports, ds.rules, ds.rulesProcessingLast
+			)
+		if "CFF2" not in exclude and ("CFF " in vf or "CFF2" in vf):
+			_add_CFF2(vf, model, master_fonts)
+			if "post" in vf:
+				# set 'post' to format 2 to keep the glyph names dropped from CFF2
+				post = vf["post"]
+				if post.formatType != 2.0:
+					post.formatType = 2.0
+					post.extraNames = []
+					post.mapping = {}
 
-	set_default_weight_width_slant(
-		vf, location={axis.axisTag: axis.defaultValue for axis in vf["fvar"].axes}
-	)
+		set_default_weight_width_slant(
+			vf, location={axis.axisTag: axis.defaultValue for axis in vf["fvar"].axes}
+		)
 
-	for tag in exclude:
-		if tag in vf:
-			del vf[tag]
+		for tag in exclude:
+			if tag in vf:
+				del vf[tag]
 
-	# TODO: Only return vf for 4.0+, the rest is unused.
-	return vf, model, master_ttfs
+		# TODO: Only the first return value is used. Remove the rest at some point.
+		return vf, model, master_ttfs
+	except (AssertionError, TypeError) as e:
+		raise VarLibError(f"Building variable font failed: {str(e)}") from e
 
 
 def _open_font(path, master_finder=lambda s: s):
@@ -946,7 +952,7 @@ def load_masters(designspace, master_finder=lambda s: s):
 		# If a SourceDescriptor has a layer name, demand that the compiled TTFont
 		# be supplied by the caller. This spares us from modifying MasterFinder.
 		if master.layerName and master.font is None:
-			raise AttributeError(
+			raise VarLibError(
 				"Designspace source '%s' specified a layer name but lacks the "
 				"required TTFont object in the 'font' attribute."
 				% (master.name or "<Unknown>")

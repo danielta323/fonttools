@@ -77,7 +77,7 @@ class Merger(object):
 				values = [getattr(table, key) for table in lst]
 				mergerFunc = mergers.get(key, defaultMerger)
 				mergerFunc(self, value, values)
-		except Exception as e:
+		except AssertionError as e:
 			e.args = e.args + ('.'+key,)
 			raise
 
@@ -86,7 +86,7 @@ class Merger(object):
 		for i,(value,values) in enumerate(zip(out, zip(*lst))):
 			try:
 				self.mergeThings(value, values)
-			except Exception as e:
+			except AssertionError as e:
 				e.args = e.args + ('[%d]' % i,)
 				raise
 
@@ -102,7 +102,7 @@ class Merger(object):
 				self.mergeLists(out, lst)
 			else:
 				assert allEqualTo(out, lst), (out, lst)
-		except Exception as e:
+		except AssertionError as e:
 			e.args = e.args + (type(out).__name__,)
 			raise
 
